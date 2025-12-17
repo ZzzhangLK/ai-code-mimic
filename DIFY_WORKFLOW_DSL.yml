@@ -1,0 +1,126 @@
+app:
+  description: '根据代码模板和 OpenAPI 定义自动仿写生成新代码'
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: AI-Code-Mimic-Advanced
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          sourceType: start
+          targetType: llm
+        id: start-to-llm
+        source: 'start-node'
+        sourceHandle: source
+        target: 'llm-node'
+        targetHandle: target
+        type: custom
+      - data:
+          sourceType: llm
+          targetType: answer
+        id: llm-to-answer
+        source: 'llm-node'
+        sourceHandle: source
+        target: 'answer-node'
+        targetHandle: target
+        type: custom
+    nodes:
+      - data:
+          desc: '接收前端传来的模板和 API 定义'
+          title: 开始
+          type: start
+          variables:
+            - label: 代码模板
+              required: true
+              type: paragraph
+              variable: code_template
+            - label: API定义
+              required: true
+              type: paragraph
+              variable: api_definitions
+        height: 89
+        id: 'start-node'
+        position:
+          x: 80
+          y: 282
+        positionAbsolute:
+          x: 80
+          y: 282
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: '核心代码仿写逻辑'
+          model:
+            provider: anthropic
+            name: claude-3-5-sonnet-20240620
+            mode: chat
+            completion_params:
+              temperature: 0.2
+          prompt_template:
+            - id: system-prompt
+              role: system
+              text: |
+                你是一个资深前端架构专家。你的任务是基于【代码模板】的风格，仿写出符合【API定义】的新代码。
+                
+                【代码模板】：
+                {{#start-node.code_template#}}
+                
+                【API定义】：
+                {{#start-node.api_definitions#}}
+                
+                要求：
+                1. 严格遵守模板中的命名规范、组件结构和技术栈。
+                2. 只输出代码，不要任何解释。
+                3. 确保类型定义完整。
+          selected: false
+          title: LLM 仿写器
+          type: llm
+          variables: []
+          vision:
+            enabled: false
+        height: 89
+        id: 'llm-node'
+        position:
+          x: 380
+          y: 282
+        positionAbsolute:
+          x: 380
+          y: 282
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          answer: '{{#llm-node.text#}}'
+          desc: '输出生成结果'
+          title: 直接回复
+          type: answer
+          variables: []
+        height: 104
+        id: 'answer-node'
+        position:
+          x: 680
+          y: 282
+        positionAbsolute:
+          x: 680
+          y: 282
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
