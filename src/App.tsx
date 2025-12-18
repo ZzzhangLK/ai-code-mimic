@@ -8,6 +8,7 @@ import { DiffResultViewer } from './components/DiffResultViewer';
 import { HistoryList } from './components/HistoryList';
 import { useAppStore } from './store/useAppStore';
 import { difyService } from './services/difyService';
+import { simplifySwagger } from './utils/simplifySwagger';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -50,15 +51,8 @@ const App: React.FC = () => {
       // 2. 组装提示词
       // 2. 准备 inputs
       const selectedApis = parsedApiEndpoints.filter(ep => selectedApiIds.includes(ep.id));
-      const apiContext = selectedApis.map(ep => {
-        let ctx = `Endpoint: ${ep.method} ${ep.path}\n`;
-        ctx += `Summary: ${ep.summary}\n`;
-        if (ep.description) ctx += `Description: ${ep.description}\n`;
-        if (ep.parameters) ctx += `Parameters: ${JSON.stringify(ep.parameters, null, 2)}\n`;
-        if (ep.requestBody) ctx += `RequestBody: ${JSON.stringify(ep.requestBody, null, 2)}\n`;
-        if (ep.responses) ctx += `Responses: ${JSON.stringify(ep.responses, null, 2)}\n`;
-        return ctx;
-      }).join('\n\n---\n\n');
+      const simplifiedApis = selectedApis.map(simplifySwagger);
+      const apiContext = JSON.stringify(simplifiedApis, null, 2);
 
       // 根据 DIFY_WORKFLOW_DSL.yml 定义的变量
       const inputs = {

@@ -1,43 +1,111 @@
 app:
-  description: '根据代码模板和 OpenAPI 定义自动仿写生成新代码'
+  description: 根据代码模板和 OpenAPI 定义自动仿写生成新代码
   icon: 🤖
   icon_background: '#FFEAD5'
   mode: advanced-chat
   name: AI-Code-Mimic-Advanced
   use_icon_as_answer_icon: false
+dependencies:
+  - current_identifier: null
+    type: package
+    value:
+      plugin_unique_identifier: langgenius/moonshot:0.0.8@39b2074f0d4dd3a739eae2e6b8825ee8c7bc0b4ebda817decafe1d368c84fae2
 kind: app
 version: 0.1.5
 workflow:
   conversation_variables: []
   environment_variables: []
   features:
+    file_upload:
+      allowed_file_extensions:
+        - .JPG
+        - .JPEG
+        - .PNG
+        - .GIF
+        - .WEBP
+        - .SVG
+      allowed_file_types:
+        - image
+      allowed_file_upload_methods:
+        - local_file
+        - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+          - local_file
+          - remote_url
+      number_limits: 3
+    opening_statement: ''
     retriever_resource:
       enabled: true
     sensitive_word_avoidance:
       enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
   graph:
     edges:
       - data:
           sourceType: start
           targetType: llm
-        id: start-to-llm
-        source: 'start-node'
+        id: start-to-intent
+        source: start-node
         sourceHandle: source
-        target: 'llm-node'
+        target: intent-analysis
         targetHandle: target
         type: custom
       - data:
           sourceType: llm
-          targetType: answer
-        id: llm-to-answer
-        source: 'llm-node'
+          targetType: llm
+        id: intent-to-mimic
+        source: intent-analysis
         sourceHandle: source
-        target: 'answer-node'
+        target: llm-node
         targetHandle: target
         type: custom
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: llm
+          targetType: template-transform
+        id: llm-node-source-1766038521917-target
+        source: llm-node
+        sourceHandle: source
+        target: '1766038521917'
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: template-transform
+          targetType: answer
+        id: 1766038521917-source-answer-node-target
+        source: '1766038521917'
+        sourceHandle: source
+        target: answer-node
+        targetHandle: target
+        type: custom
+        zIndex: 0
     nodes:
       - data:
-          desc: '接收前端传来的模板和 API 定义'
+          desc: 接收前端传来的模板和 API 定义
+          selected: false
           title: 开始
           type: start
           variables:
@@ -53,8 +121,8 @@ workflow:
               required: false
               type: paragraph
               variable: global_interfaces
-        height: 89
-        id: 'start-node'
+        height: 169
+        id: start-node
         position:
           x: 80
           y: 282
@@ -69,140 +137,137 @@ workflow:
           context:
             enabled: false
             variable_selector: []
-          desc: '核心代码仿写逻辑'
+          desc: 核心代码仿写逻辑
           model:
+            completion_params: {}
             mode: chat
-            name: qwen3-vl-235b-a22b-thinking
-            provider: langgenius/tongyi/tongyi
-            completion_params:
-              temperature: 0.2
+            name: kimi-k2-turbo-preview
+            provider: langgenius/moonshot/moonshot
           prompt_template:
             - id: system-prompt
               role: system
-              text: |
-                # Dify LLM System Prompt - AI Code Mimic
-
-                ## 🎯 任务角色
-
-                You are an expert TypeScript/React code generator. Your task is to analyze existing code patterns and generate new code for different API endpoints while maintaining EXACT consistency in style, structure, and conventions.
-
-                ## 📖 全局类型定义 (Reference Only)
-
-                生成的代码必须优先使用以下项目中定义的通用泛型包装器：
-
-                ```typescript
-                {{#start-node.global_interfaces#}}
-                ```
-
-                ## 📥 输入变量
-
-                ### 1. Code Template (代码模板)
-                ```
-                {{#start-node.code_template#}}
-                ```
-
-                ### 2. API Definitions (目标接口定义)
-                ```
-                {{#start-node.api_definitions#}}
-                ```
-
-                ## 📋 执行步骤
-
-                ### Step 1: 深度分析模板
-                - **结构检查**: 模板是导出独立接口还是统一的 `Api` 对象？如果是对象，必须将新方法追加到对象中。
-                - **依赖库调用**: 严格模仿 `request.get({ url, params })` 或 `request.post({ url, data })`。
-                - **泛型选择**:
-                  - 如果 API 响应包含 `list` 和 `total` -> **必须**使用 `InterListFunction`。
-                  - 如果 API 响应包含 `data`, `success` -> **必须**使用 `InterDataFunction`。
-                  - 普通响应 -> 使用 `InterFunction`。
-
-                ### Step 2: 提取 API 信息
-                提取 Method, Path, Summary, Parameters, RequestBody, Responses。
-
-                ### Step 3: 代码生成
-                1. **命名**: 优先使用 Summary 翻译为 PascalCase 作为类型名，小驼峰作为方法名。
-                2. **类型合并**: 将所有新生成的 Type 定义放在一起。
-                3. **实现合并**: 如果模板有 `Api` 对象，生成一个**合并后**的完整对象。
-
-                ## ⚠️ 严格约束
-
-                - **禁止 Markdown**: 直接输出纯代码，不要包裹在 ```typescript 中。
-                - **禁止解释**: 严禁输出 "Here is the code" 等任何废话。
-                - **100% 模仿**: 包括缩进（2格）、引号（单引号）、分号（不要）。
-
-                ## 💡 Few-Shot 示例
-
-                ### 输入:
-                **Template**:
-                ```typescript
-                import { InterFunction } from '@/utils/interface'
-                export type UserGet = InterFunction<{ id: string }, { name: string }>
-                export const UserApi = {
-                  UserGet: (params) => request.get({ url: '/api/user', params })
-                }
-                ```
-                **API**:
-                ```
-                Endpoint: POST /api/user/list
-                Summary: 获取用户列表
-                Responses: {"list":[], "total":0}
-                ```
-
-                ### 输出:
-                export type UserListPage = InterListFunction<
-                  { keyword?: string },
-                  { id: string; name: string }
-                >
-
-                export const UserApi = {
-                  UserGet: (params) => {
-                    return request.get({ url: '/api/user', params })
-                  },
-                  UserListPage: (data) => {
-                    return request.post({ url: '/api/user/list', data })
-                  }
-                }
-
-                ---
-                **现在开始生成。只需输出代码。**
+              text: "# Role\n你是一位资深的前端架构师。你的核心能力是**像素级代码仿写**。\n\n# Task\n我将提供【参考代码模板】、【待开发接口定义】以及【意图分析结果】。\n\
+            请你仔细阅读【待开发接口定义】，提取其中的 URL、Method、Params、Response，并结合【意图分析结果】中的 Entity 和 Action，然后**完全照搬**【参考代码模板】的代码风格（包括缩进、命名习惯、泛型封装方式、request\
+            \ 调用方式），生成新的接口代码。\n\n# Inputs\n<CodeTemplate>\n{{#start-node.code_template#}}\n\
+            </CodeTemplate>\n\n<GlobalInterfaces>\n{{#start-node.global_interfaces#}}\n\
+            </GlobalInterfaces>\n\n<TargetApiDefinition>\n{{#start-node.api_definitions#}}\n\
+            </TargetApiDefinition>\n\n<IntentAnalysis>\n{{#intent-analysis.text#}}\n\
+            </IntentAnalysis>\n\n# Constraints\n1. **严禁幻觉**：生成的代码必须严格基于 <TargetApiDefinition>\
+            \ 中的真实字段（如 audioTextId, markingDimension 等），绝对不能生成 Role、User 等无关内容。\n\
+            2. **风格一致性**：\n   - 必须使用 `InterFunction` 或 `InterListFunction`（根据模板判断）。\n\
+            \   - 必须保留 `request.get/post` 的封装形式。\n   - 导出类型命名规范：使用 <IntentAnalysis> 中的 Entity 和 Action 进行命名。\n3. **输出格式**：不要包含 Markdown 标记（```），只输出纯代码。\n\
+            \n# Workflow (必须严格遵守的思考步骤)\n在生成最终代码前，请先在内心进行以下步骤（不要输出思考过程，直接输出结果）：\n1.\
+            \ 分析 <TargetApiDefinition>，确认字段名和类型。\n2. 观察 <IntentAnalysis>，确认该 Entity 和 Action。\n3. 将数据填入模板结构。\n\n# Final Output\n\
+            直接输出 TypeScript 代码，不要包含任何解释性文字。"
             - id: user-prompt
               role: user
-              text: |
-                请严格遵循系统提示词中的规则，基于你所分析的【代码模板】风格，为【目标接口定义】生成仿写代码。注意：只输出代码，严禁带有 Markdown 代码块标记（```）。
+              text: '当前任务：
 
-          selected: false
+            请忽略之前所有的 User/Role 案例。
+
+            专注于处理以下 API：
+
+            {{#start-node.api_definitions#}}
+
+
+            请为上述 API 生成对应的 TypeScript 类型定义和 API 调用函数。
+
+            请确保字段名（如 {{#start-node.api_definitions#}} 中出现的 specifically fields）被正确映射。'
+          selected: true
           title: LLM 仿写器
           type: llm
           variables: []
           vision:
             enabled: false
-        height: 89
-        id: 'llm-node'
+        height: 117
+        id: llm-node
         position:
           x: 380
           y: 282
         positionAbsolute:
           x: 380
+          y: 282
+        selected: true
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          answer: '{{#1766038521917.output#}}'
+          desc: 输出生成结果
+          selected: false
+          title: 直接回复
+          type: answer
+          variables: []
+        height: 132
+        id: answer-node
+        position:
+          x: 980
+          y: 282
+        positionAbsolute:
+          x: 980
+          y: 282
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          desc: ''
+          selected: false
+          template: '{{ arg1 }}'
+          title: 模板转换
+          type: template-transform
+          variables:
+            - value_selector:
+                - llm-node
+                - text
+              variable: arg1
+        height: 53
+        id: '1766038521917'
+        position:
+          x: 680
+          y: 282
+        positionAbsolute:
+          x: 680
           y: 282
         sourcePosition: right
         targetPosition: left
         type: custom
         width: 244
       - data:
-          answer: '{{#llm-node.text#}}'
-          desc: '输出生成结果'
-          title: 直接回复
-          type: answer
+          context:
+            enabled: false
+            variable_selector: []
+          desc: 分析输入的 API 定义，提取实体和操作
+          model:
+            completion_params: {}
+            mode: chat
+            name: kimi-k2-turbo-preview
+            provider: langgenius/moonshot/moonshot
+          prompt_template:
+            - id: system-prompt
+              role: system
+              text: "# Role\n你是一个资深的前端 API 意图分析员。\n\n# Task\n分析输入的 API 定义，提取出核心实体名称（Entity Name）和操作类型（Action）。\n\n# Inputs\n<TargetApiDefinition>\n{{#start-node.api_definitions#}}\n</TargetApiDefinition>\n\n# Output Requirements\n请以 JSON 格式输出，包含以下字段：\n- entity: 核心实体名称（大驼峰命名，如 AudioMarking）\n- action: 操作类型（大驼峰命名，如 Create, GetList, Update, Delete）\n\n# Constraints\n- 只输出 JSON，不要有任何其他解释文字。\n- 实体名称应基于 URL 路径的核心部分。\n- 操作类型应基于 URL 路径的末尾或 Method。"
+          selected: false
+          title: 意图解析
+          type: llm
           variables: []
-        height: 104
-        id: 'answer-node'
+          vision:
+            enabled: false
+        height: 117
+        id: intent-analysis
         position:
-          x: 680
-          y: 282
+          x: 380
+          y: 450
         positionAbsolute:
-          x: 680
-          y: 282
+          x: 380
+          y: 450
         sourcePosition: right
         targetPosition: left
         type: custom
         width: 244
+    viewport:
+      x: 19.255736410105328
+      y: 120.57473389317818
+      zoom: 0.7348672461377991
