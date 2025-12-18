@@ -50,19 +50,34 @@ const App: React.FC = () => {
       // 2. 组装提示词
       // 2. 准备 inputs
       const selectedApis = parsedApiEndpoints.filter(ep => selectedApiIds.includes(ep.id));
-      const apiContext = selectedApis.map(ep => `
-Endpoint: ${ep.method} ${ep.path}
-Summary: ${ep.summary}
-Description: ${ep.description || ''}
-Parameters: ${ep.parameters ? JSON.stringify(ep.parameters) : 'None'}
-RequestBody: ${ep.requestBody ? JSON.stringify(ep.requestBody) : 'None'}
-Responses: ${ep.responses ? JSON.stringify(ep.responses) : 'None'}
-`).join('\n---\n');
+      const apiContext = selectedApis.map(ep => {
+        let ctx = `Endpoint: ${ep.method} ${ep.path}\n`;
+        ctx += `Summary: ${ep.summary}\n`;
+        if (ep.description) ctx += `Description: ${ep.description}\n`;
+        if (ep.parameters) ctx += `Parameters: ${JSON.stringify(ep.parameters, null, 2)}\n`;
+        if (ep.requestBody) ctx += `RequestBody: ${JSON.stringify(ep.requestBody, null, 2)}\n`;
+        if (ep.responses) ctx += `Responses: ${JSON.stringify(ep.responses, null, 2)}\n`;
+        return ctx;
+      }).join('\n\n---\n\n');
 
       // 根据 DIFY_WORKFLOW_DSL.yml 定义的变量
       const inputs = {
         code_template: templateCode,
-        api_definitions: apiContext
+        api_definitions: apiContext,
+        global_interfaces: `
+// 分页通用接口
+export interface PaginationProps { pageNo: number; pageSize: number; }
+// 通用返回接口(分页)
+export interface ResponseListType<D> { total: number; list: Array<D>; }
+// 通用返回接口（有数据）
+export interface ResponseDataType<D> { success: boolean; message: string; data: D; }
+// 通用接口封装函数(分页)
+export interface InterListFunction<D extends object, T> { (req: D & Partial<PaginationProps>): Promise<ResponseListType<T>> }
+// 通用接口封装函数(不分页)
+export interface InterFunction<D extends object, T> { (req?: D): Promise<T> }
+// 通用接口封装函数(不分页)有data
+export interface InterDataFunction<D extends object, T> { (req?: D): Promise<ResponseDataType<T>> }
+        `.trim()
       };
  
       // 3. 调用 API
@@ -81,9 +96,9 @@ Responses: ${ep.responses ? JSON.stringify(ep.responses) : 'None'}
       });
 
       message.success('代码生成成功！');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      message.error(error.message || '生成失败。');
+      message.error((error as any).message || '生成失败。');
     } finally {
       setIsGenerating(false);
     }
@@ -161,7 +176,7 @@ Responses: ${ep.responses ? JSON.stringify(ep.responses) : 'None'}
             <div style={{ 
               width: 'calc(50% - 8px)', 
               minWidth: '300px',
-              height: 'calc(50vh - 56px)',
+              height: 'calc(96vh - 56px)',
               overflow: 'hidden' 
             }}>
                <CodeEditorArea />
@@ -171,7 +186,7 @@ Responses: ${ep.responses ? JSON.stringify(ep.responses) : 'None'}
             <div style={{ 
               width: 'calc(50% - 8px)', 
               minWidth: '300px',
-              height: 'calc(50vh - 56px)',
+              height: 'calc(96vh - 56px)',
               overflow: 'hidden' 
             }}>
                <DiffResultViewer />

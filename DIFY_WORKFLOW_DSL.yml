@@ -49,6 +49,10 @@ workflow:
               required: true
               type: paragraph
               variable: api_definitions
+            - label: 全局接口定义
+              required: false
+              type: paragraph
+              variable: global_interfaces
         height: 89
         id: 'start-node'
         position:
@@ -67,27 +71,105 @@ workflow:
             variable_selector: []
           desc: '核心代码仿写逻辑'
           model:
-            provider: anthropic
-            name: claude-3-5-sonnet-20240620
             mode: chat
+            name: qwen3-vl-235b-a22b-thinking
+            provider: langgenius/tongyi/tongyi
             completion_params:
               temperature: 0.2
           prompt_template:
             - id: system-prompt
               role: system
               text: |
-                你是一个资深前端架构专家。你的任务是基于【代码模板】的风格，仿写出符合【API定义】的新代码。
-                
-                【代码模板】：
+                # Dify LLM System Prompt - AI Code Mimic
+
+                ## 🎯 任务角色
+
+                You are an expert TypeScript/React code generator. Your task is to analyze existing code patterns and generate new code for different API endpoints while maintaining EXACT consistency in style, structure, and conventions.
+
+                ## 📖 全局类型定义 (Reference Only)
+
+                生成的代码必须优先使用以下项目中定义的通用泛型包装器：
+
+                ```typescript
+                {{#start-node.global_interfaces#}}
+                ```
+
+                ## 📥 输入变量
+
+                ### 1. Code Template (代码模板)
+                ```
                 {{#start-node.code_template#}}
-                
-                【API定义】：
+                ```
+
+                ### 2. API Definitions (目标接口定义)
+                ```
                 {{#start-node.api_definitions#}}
-                
-                要求：
-                1. 严格遵守模板中的命名规范、组件结构和技术栈。
-                2. 只输出代码，不要任何解释。
-                3. 确保类型定义完整。
+                ```
+
+                ## 📋 执行步骤
+
+                ### Step 1: 深度分析模板
+                - **结构检查**: 模板是导出独立接口还是统一的 `Api` 对象？如果是对象，必须将新方法追加到对象中。
+                - **依赖库调用**: 严格模仿 `request.get({ url, params })` 或 `request.post({ url, data })`。
+                - **泛型选择**:
+                  - 如果 API 响应包含 `list` 和 `total` -> **必须**使用 `InterListFunction`。
+                  - 如果 API 响应包含 `data`, `success` -> **必须**使用 `InterDataFunction`。
+                  - 普通响应 -> 使用 `InterFunction`。
+
+                ### Step 2: 提取 API 信息
+                提取 Method, Path, Summary, Parameters, RequestBody, Responses。
+
+                ### Step 3: 代码生成
+                1. **命名**: 优先使用 Summary 翻译为 PascalCase 作为类型名，小驼峰作为方法名。
+                2. **类型合并**: 将所有新生成的 Type 定义放在一起。
+                3. **实现合并**: 如果模板有 `Api` 对象，生成一个**合并后**的完整对象。
+
+                ## ⚠️ 严格约束
+
+                - **禁止 Markdown**: 直接输出纯代码，不要包裹在 ```typescript 中。
+                - **禁止解释**: 严禁输出 "Here is the code" 等任何废话。
+                - **100% 模仿**: 包括缩进（2格）、引号（单引号）、分号（不要）。
+
+                ## 💡 Few-Shot 示例
+
+                ### 输入:
+                **Template**:
+                ```typescript
+                import { InterFunction } from '@/utils/interface'
+                export type UserGet = InterFunction<{ id: string }, { name: string }>
+                export const UserApi = {
+                  UserGet: (params) => request.get({ url: '/api/user', params })
+                }
+                ```
+                **API**:
+                ```
+                Endpoint: POST /api/user/list
+                Summary: 获取用户列表
+                Responses: {"list":[], "total":0}
+                ```
+
+                ### 输出:
+                export type UserListPage = InterListFunction<
+                  { keyword?: string },
+                  { id: string; name: string }
+                >
+
+                export const UserApi = {
+                  UserGet: (params) => {
+                    return request.get({ url: '/api/user', params })
+                  },
+                  UserListPage: (data) => {
+                    return request.post({ url: '/api/user/list', data })
+                  }
+                }
+
+                ---
+                **现在开始生成。只需输出代码。**
+            - id: user-prompt
+              role: user
+              text: |
+                请严格遵循系统提示词中的规则，基于你所分析的【代码模板】风格，为【目标接口定义】生成仿写代码。注意：只输出代码，严禁带有 Markdown 代码块标记（```）。
+
           selected: false
           title: LLM 仿写器
           type: llm
